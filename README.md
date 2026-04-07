@@ -9,13 +9,21 @@ health insurance pricing case:
 2. A linear regression workflow rebuilt in Python using the reasoning style from
    the car rental regression reference file.
 
-The main purpose is not only to compare model outputs, but also to build a
-clear, interview-ready explanation of the statistical choices behind each step.
+The main purpose is not only to compare model outputs, but also to help a
+health insurance company decide how much to charge for its plans in a way that
+reduces the chance of financial losses while supporting customer acquisition.
+The project is also designed to build a clear, interview-ready explanation of
+the statistical choices behind each step.
 
 ## Project Goal
 
 The project is designed to answer the same business problem with two methods and
 evaluate both of them on unseen data.
+
+The business question is broader than rebuilding a clustering notebook. The
+real goal is to compare two analytical strategies for pricing health insurance
+plans and to understand which approach produces more useful information for
+premium-setting decisions.
 
 The comparison should follow the same evaluation logic for both approaches:
 
@@ -58,6 +66,8 @@ health_insurance_case_linear_regression_and_clustering_compairson/
 - Build a regression-based notebook in Python inspired by the statistical
   commentary style from the car rental R file.
 - Compare predictions and interpretation quality between both methods.
+- Keep the project centered on the pricing decision: how to charge enough to
+  avoid losses while remaining competitive enough to attract customers.
 - Keep notebook explanations focused on why each statistical technique is being
   used, not only on how the code works.
 
@@ -70,8 +80,9 @@ health_insurance_case_linear_regression_and_clustering_compairson/
   files.
 - The project objectives file is currently stored in `docs/Objetivos do
   projeto.txt`.
-- The next implementation step is to start building the notebook workflow and
-  populate the `data/` and `notebooks/` folders with the working project files.
+- The next implementation step is to start building the main notebook workflow
+  for the full comparison case and populate the `data/` and `notebooks/`
+  folders with the working project files.
 
 ## Suggested Next Git Step
 
