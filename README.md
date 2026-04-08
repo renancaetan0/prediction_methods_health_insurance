@@ -5,9 +5,8 @@
 This project compares two different analytical approaches for solving the same
 health insurance pricing case:
 
-1. A clustering-based workflow rebuilt from the completed health insurance case.
-2. A linear regression workflow rebuilt in Python using the reasoning style from
-   the car rental regression reference file.
+1. a clustering-based approach, rebuilt from the completed health insurance case;
+2. a linear regression approach, using multiple regression and model refinement through stepwise AIC evaluation.
 
 The main purpose is not only to compare model outputs, but also to help a
 health insurance company decide how much to charge for its plans in a way that
@@ -36,16 +35,6 @@ The comparison should follow the same evaluation logic for both approaches:
 5. Compare both approaches on unseen data to understand their predictive
    behavior, strengths, and limitations.
 
-## Learning Objectives
-
-This repository is also a guided practice environment for:
-
-- understanding the statistical concepts used in each block of analysis;
-- improving professional Git and GitHub habits with beginner-friendly workflow;
-- documenting code and notebooks in a way that supports job interview
-  explanations;
-- practicing English in a project environment.
-
 ## Repository Structure
 
 ```text
@@ -57,37 +46,4 @@ health_insurance_case_linear_regression_and_clustering_compairson/
 ├── reference_files/
 ├── .gitignore
 └── README.md
-```
-
-## Planned Workflow
-
-- Reuse the health insurance clustering case as the reference business problem.
-- Recreate the clustering pipeline with an explicit train-test split.
-- Build a regression-based notebook in Python inspired by the statistical
-  commentary style from the car rental R file.
-- Compare predictions and interpretation quality between both methods.
-- Keep the project centered on the pricing decision: how to charge enough to
-  avoid losses while remaining competitive enough to attract customers.
-- Keep notebook explanations focused on why each statistical technique is being
-  used, not only on how the code works.
-
-## Current Status
-
-- Project folders were created.
-- `.gitignore` was configured to ignore `codex_files/`, `reference_files/`, and
-  `.vscode/`.
-- A root-level `docs/` folder was added for project notes and supporting text
-  files.
-- The project objectives file is currently stored in `docs/Objetivos do
-  projeto.txt`.
-- The next implementation step is to start building the main notebook workflow
-  for the full comparison case and populate the `data/` and `notebooks/`
-  folders with the working project files.
-
-## Suggested Next Git Step
-
-After reviewing this README, the next repository setup step should be:
-
-```bash
-git init
 ```
