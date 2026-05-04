@@ -3,3 +3,5 @@ reference_files/
 .vscode/
 docs/
 debug.log
+debug/
+data/kmeans_model_trained.pkl
