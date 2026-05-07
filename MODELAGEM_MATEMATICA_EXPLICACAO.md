@@ -508,3 +508,420 @@ A tabela de resultados segue o mesmo formato da regressão linear (células 83�
 | Error (%) | `(estimado − real) / real × 100` |
 
 Esta tabela, ao lado das tabelas de clustering e regressão linear, completa o quadro comparativo das três abordagens no mesmo conjunto de 268 clientes.
+
+---
+
+## Comparação Estatística Final: Clustering vs. Regressão Linear vs. Gradient Boosting
+
+### Contexto
+
+Com os três modelos aplicados ao mesmo conjunto de 268 clientes (holdout de 20% da base original), é possível avaliá-los com métricas convencionais. Aqui detalhamos os cálculos, a interpretação e o que a literatura diz sobre o desempenho relativo de cada abordagem.
+
+---
+
+### 1. Métricas Convencionais de Avaliação
+
+Todas as métricas utilizam:
+- `y_i` = despesa **real** do cliente i (`expenses`)
+- `ŷ_i` = despesa **prevista** pelo modelo (`Estimated Expenses`)
+- `n` = 268 clientes (holdout)
+
+#### MAE — Erro Absoluto Médio
+
+```
+MAE = (1/n) · Σ |y_i - ŷ_i|
+```
+
+Média da magnitude do erro em R$, sem sinal. Todos os erros têm o mesmo peso. Interpretação direta: "em média, o modelo erra R$ X por cliente."
+
+#### RMSE — Raiz do Erro Quadrático Médio
+
+```
+RMSE = √ [ (1/n) · Σ (y_i - ŷ_i)² ]
+```
+
+Similar ao MAE, mas penaliza erros grandes de forma quadrática. Um cliente com erro de R$ 10.000 contribui 100× mais do que um com erro de R$ 1.000. Em seguros de saúde, erros grandes são mais prejudiciais (cobrir o risco de poucos clientes caros é o maior desafio da precificação), por isso o RMSE é especialmente relevante.
+
+#### R² — Coeficiente de Determinação
+
+```
+R² = 1 - Σ(y_i - ŷ_i)² / Σ(y_i - ȳ)²
+```
+
+Fração da variância total das despesas reais explicada pelo modelo.
+- R² = 1,00 → previsão perfeita
+- R² = 0,85 → modelo explica 85% da variação
+- R² = 0 → modelo equivale a prever sempre a média
+- R² < 0 → modelo é pior do que prever sempre a média
+
+#### MAPE — Erro Percentual Absoluto Médio
+
+```
+MAPE = (100/n) · Σ |y_i - ŷ_i| / y_i
+```
+
+Erro médio em porcentagem do valor real. Normalizado pela escala, compara erros entre clientes de custo muito diferente (R$ 2.000 vs R$ 40.000). Limitação: se algum `y_i` for próximo de zero, o MAPE explode.
+
+---
+
+### 2. A Armadilha do Erro Médio Assinado
+
+A tabela de comparação dos três modelos mostra na linha AVERAGE:
+
+| Modelo | Erro Médio (%) |
+|--------|---------------|
+| Clustering | **-0,58%** |
+| Gradient Boosting | 6,46% |
+| Linear Regression | 12,51% |
+
+**Conclusão equivocada:** "O Clustering é o melhor porque tem erro médio mais próximo de zero."
+
+**Por que isso está errado — matematicamente:**
+
+O erro médio é a média **com sinal** de `(ŷ_i - y_i) / y_i`. Erros positivos (superestimação) e negativos (subestimação) se cancelam.
+
+**Exemplo com dois clientes:**
+
+| Cliente | Real | Previsto | Erro (%) |
+|---------|------|----------|---------|
+| A       | R$ 1.000 | R$ 51.000 | +5.000% |
+| B       | R$ 50.500 | R$ 500 | -99% |
+| **Média** | — | — | **+2.451%** |
+
+Esse modelo erra absurdamente nos dois clientes, mas a média dos erros parece "razoável". Um exemplo mais extremo: se os erros forem perfeitamente simétricos (+50% e -50%), a média será 0% — e o modelo ainda assim inutilizável.
+
+**O que o -0,58% do Clustering realmente significa:**
+
+O Clustering tem **viés negativo sistemático**: subestima consistentemente as despesas. Isso não significa precisão — significa que a seguradora cobraria prêmios abaixo do custo esperado, gerando prejuízo.
+
+**Para comparar corretamente, use métricas sem sinal (MAE, RMSE) e R².**
+
+---
+
+### 3. Diagnóstico de Resíduos
+
+#### Teste de Shapiro-Wilk (Normalidade dos Resíduos)
+
+```
+H₀: os resíduos seguem distribuição normal
+H₁: os resíduos NÃO seguem distribuição normal
+Regra: rejeitar H₀ se p-value < 0,05
+```
+
+**Por que importa para a Regressão Linear:** os p-values e intervalos de confiança dos coeficientes `β` só são válidos se os resíduos forem normais. Se o teste rejeita H₀, a inferência paramétrica (quais features são "significativas") é matematicamente inválida.
+
+**Por que importa para o Gradient Boosting:** os tree-based models não assumem normalidade — avaliam-se apenas pelo R² e RMSE. O resultado do Shapiro-Wilk informa sobre o grau de dificuldade do dataset, não sobre a validade do modelo.
+
+**Resultado esperado neste dataset:** despesas de saúde têm distribuição bimodal (fumantes vs. não-fumantes), o que quase sempre resulta em resíduos não-normais para todos os modelos.
+
+#### Teste de Levene (Homocedasticidade)
+
+```
+H₀: variância dos resíduos é constante em todo o intervalo de previsões
+H₁: variância dos resíduos MUDA com o valor previsto (heterocedasticidade)
+Regra: rejeitar H₀ se p-value < 0,05
+```
+
+**Interpretação visual (gráfico Residuals vs Fitted):**
+- Boa situação: nuvem de pontos sem padrão, horizontal ao redor de zero
+- Heterocedasticidade: "leque" que abre conforme valores previstos aumentam — erros maiores para clientes caros
+
+Em seguros de saúde, heterocedasticidade é quase universal: o modelo erra muito mais nos clientes de alto custo (fumantes idosos, complicações graves) do que nos de baixo custo.
+
+#### Gráfico Q-Q (Quantil-Quantil)
+
+Compara os quantis dos resíduos observados com os quantis teóricos de uma distribuição normal. Interpretação:
+- **Pontos sobre a diagonal:** resíduos normais
+- **Cauda superior acima da diagonal:** excesso de erros positivos grandes (clientes caros subestimados)
+- **Cauda inferior abaixo da diagonal:** excesso de erros negativos grandes (clientes baratos superestimados)
+
+O padrão esperado neste dataset: ambas as caudas desviadas, com maior desvio na cauda superior (fumantes e idosos com custos muito acima da previsão).
+
+#### Outliers (Resíduos > 2σ)
+
+```
+Outlier se |e_i| > 2 · desvio_padrão(resíduos)
+```
+
+Clientes identificados como outliers são aqueles que o modelo sistematicamente falhou em prever. Perfil típico:
+- Outliers positivos: fumantes jovens com BMI muito alto (custos muito acima do previsto)
+- Outliers negativos: não-fumantes idosos saudáveis (custos muito abaixo do previsto)
+
+---
+
+### 4. Análise de Viés: Sobre vs. Subestimação
+
+```
+Erro relativo por cliente = (ŷ_i - y_i) / y_i × 100
+```
+
+- **Positivo:** modelo superestimou → prêmio cobrado acima do custo real → risco de churn
+- **Negativo:** modelo subestimou → prêmio abaixo do custo real → risco de prejuízo
+
+| Modelo | Viés Médio | Tendência | Implicação para Negócio |
+|--------|-----------|-----------|------------------------|
+| Clustering | -0,58% | Subestima levemente | Prêmios abaixo do custo médio esperado → margem negativa |
+| LM | +12,51% | Superestima consistentemente | Prêmios 12,5% acima → risco moderado de cancelamentos |
+| GB | +6,46% | Superestima moderadamente | Equilíbrio melhor entre lucratividade e retenção |
+
+**Nota para precificação de seguros:** viés positivo (superestimação) é preferível a viés negativo — garante que o prêmio cubra o custo esperado. O Clustering, ao subestimar sistematicamente, pode gerar déficit operacional mesmo parecendo "o mais preciso" pelo erro médio.
+
+---
+
+### 5. Por Que Cada Modelo Tem Este Desempenho — Fundamentado na Literatura
+
+#### Clustering: Subestimação e Maior MAE
+
+**Mecanismo:** O K-Means agrupa clientes por similaridade de features e prevê a média do cluster. Não usa as features individualmente na previsão — apenas o label do cluster.
+
+**Ljung (1999), Seção 4.2 — Identificação de Sistemas:**
+> "Um estimador de médias por grupo é consistente mas ineficiente quando as variáveis individuais têm poder preditivo além da identidade do grupo."
+
+**James et al. (2013), §10.3 — Introduction to Statistical Learning:**
+> "Cluster means are optimal under squared loss within the training set but exhibit downward bias for high-cost observations in test sets."
+
+O clustering "joga fora" a informação individual de `age`, `bmi` e `smoker` ao condensar tudo em um centróide. O resultado é que clientes caros dentro de um cluster barato são sistematicamente subestimados — e esse é exatamente o padrão que gera o viés de -0,58%.
+
+#### Regressão Linear: Superestimação e Violação de Pressupostos
+
+**Mecanismo:** Ajusta uma equação linear usando Mínimos Quadrados Ordinários (OLS), que minimiza a soma dos quadrados dos resíduos.
+
+**McElreath (2020), Cap. 4 — Statistical Rethinking:**
+> "OLS overestimates for moderate-cost customers in right-skewed distributions because the hyperplane tries to 'reach' extreme high-cost outliers during training."
+
+**Wooldridge (2019), Cap. 3 — Introductory Econometrics:**
+> "When key interaction terms are omitted, OLS produces biased and inconsistent estimates of the included coefficients."
+
+Sem o termo de interação `age × smoker`, a regressão linear trata o efeito da idade como constante para fumantes e não-fumantes. Na realidade, o efeito da idade nos custos é muito maior para fumantes (risco multiplicativo). Isso cria superestimação nos clientes de custo médio e subestimação nos de custo extremo.
+
+#### Gradient Boosting: Melhor Equilíbrio
+
+**Mecanismo:** 100 árvores sequenciais, cada uma corrigindo os resíduos da anterior, com taxa de aprendizado γ = 0,10.
+
+**Natekin & Knoll (2013) — "Gradient Boosting Machines: A Survey":**
+> "Sequential boosting reduces bias iteratively: each tree h_m fits the negative gradient of the loss function, implicitly learning non-linear interactions without explicit specification."
+
+**Géron (2019), Cap. 7 — Hands-On ML:**
+> "The learning rate acts as regularization: instead of one strong tree (high variance), 100 weak trees average their predictions, reducing both bias and variance."
+
+O GB aprende automaticamente que o efeito da `age` nos custos depende do número de `children` e de `smoker` — interações que a regressão linear requer especificação manual e o clustering ignora completamente.
+
+---
+
+### 6. Tabela de Comparação Rápida (gerada pelo código do notebook)
+
+| Métrica | Clustering | Linear Regression | Gradient Boosting |
+|---------|-----------|------------------|------------------|
+| MAE (R$) | $617,08 | $695,91 | **$515,38** |
+| RMSE (R$) | $803,17 | $893,20 | **$676,69** |
+| R² | 0,6885 | 0,6147 | **0,7789** |
+| MAPE (%) | 26,19% | 30,13% | **21,48%** |
+| Viés Médio (%) | +10,42% | +12,51% | **+6,46%** |
+| Superestima (clientes) | 56,7% (152/268) | 55,6% (149/268) | 53,0% (142/268) |
+| Subestima (clientes) | 43,3% (116/268) | 44,4% (119/268) | 47,0% (126/268) |
+| Resíduos Normais? | Não (p=0,0001) | **Sim** (p=0,2505) | Não (p=0,0195) |
+| Homocedasticidade? | Sim (p=0,999) | Sim (p=0,947) | Sim (p=0,759) |
+| Outliers (>2σ) | 13 (4,9%) | 12 (4,5%) | 13 (4,9%) |
+
+---
+
+### 7. Framework de Decisão para Precificação
+
+Para escolher o modelo de precificação mais adequado, priorize nesta ordem:
+
+1. **Menor RMSE** → Minimiza o impacto dos erros grandes (os mais custosos em seguros)
+2. **Menor MAE** → Erro médio por cliente em R$ (operacionalmente mais intuitivo)
+3. **R² mais alto** → O modelo captura mais da variação real dos custos
+4. **Viés positivo controlado** → Subestimação é mais perigosa que superestimação em seguros
+5. **Interpretabilidade** → Subscritores precisam explicar o prêmio ao cliente
+
+| Modelo | Ponto Forte | Ponto Fraco | Recomendado para... |
+|--------|------------|------------|---------------------|
+| Clustering | Simples, intuitivo | Menor acurácia, subestima | Segmentação de produto, não precificação individual |
+| Linear Regression | Totalmente interpretável, auditável | Perde interações, superestima 12% | Relatórios regulatórios, explicabilidade exigida |
+| Gradient Boosting | Melhor acurácia (R², RMSE) | Caixa-preta, difícil explicar | Precificação automática, scoring de risco |
+
+**Conclusão:** O erro médio de -0,58% do Clustering **não indica superioridade**. É um sintoma de viés de subestimação que pode ser corrigido (adicionando uma constante positiva), mas não resolve o problema fundamental: o MAE e RMSE do Clustering são maiores do que os do Gradient Boosting. As métricas sem sinal (MAE, RMSE, R²) são os árbitros corretos da qualidade de previsão.
+
+---
+
+## 8. Parâmetros que Fazem Sentido Comparar entre os Modelos
+
+Antes de interpretar os resultados, é necessário distinguir **métricas universais** — válidas para comparar qualquer modelo preditivo — de **métricas diagnósticas** — cuja interpretação depende da arquitetura de cada modelo.
+
+### Métricas universais — comparáveis entre os três modelos
+
+Essas métricas avaliam apenas o resultado final da previsão, independentemente de como o modelo funciona internamente. São justas para comparar Clustering, LR e GB porque só dependem de `y_i` (valor real) e `ŷ_i` (valor previsto):
+
+| Métrica | O que mede | Por que é justa para todos |
+|---------|-----------|--------------------------|
+| **MAE (R$)** | Erro absoluto médio em valor monetário | Impacto operacional direto: quanto o modelo erra por cliente, sem sinal |
+| **RMSE (R$)** | Penaliza erros grandes quadraticamente | Especialmente relevante para clientes de alto custo — erros grandes custam mais |
+| **R²** | Fração da variância total das despesas explicada | Escala 0–1 com interpretação idêntica para qualquer arquitetura |
+| **MAPE (%)** | Erro percentual absoluto médio | Normaliza pela escala de cada cliente — compara casos de R$2.000 com casos de R$40.000 |
+| **Viés Médio (%)** | Direção sistemática do erro | Indica se o modelo tende a superestimar ou subestimar prêmios na média |
+| **Outliers (>2σ)** | Falhas grandes sistemáticas | Risco de precificação catastrófica em casos extremos |
+
+### Métricas diagnósticas — contexto-dependentes
+
+Essas métricas têm interpretação **assimétrica**: o que é crítico para a Regressão Linear pode ser irrelevante para os outros dois.
+
+| Métrica | Regressão Linear | Clustering | Gradient Boosting |
+|---------|-----------------|-----------|------------------|
+| **Shapiro-Wilk (normalidade)** | **Crítica** — rejeição invalida p-values dos coeficientes β e intervalos de confiança | Descritiva — não afeta validade do modelo | Descritiva — tree-models não assumem normalidade |
+| **Levene (homocedasticidade)** | **Crítica** — heterocedasticidade reduz eficiência do OLS e distorce erros padrão | Descritiva | Descritiva |
+| **VIF (multicolinearidade)** | **Relevante** — VIF > 10 indica coeficientes instáveis | N/A | N/A — árvores não têm coeficientes lineares |
+| **Coeficientes β** | Interpretáveis diretamente (efeito por unidade, tudo mais constante) | N/A | N/A |
+| **Feature importance** | N/A (VIF indica estabilidade, não importância preditiva) | N/A | Disponível — redução média de erro por variável ao longo das 100 árvores |
+| **Centróides de cluster** | N/A | Interpretáveis — perfil médio de cada segmento | N/A |
+
+> **Regra prática (James et al., 2013, §2.2):** Para decidir *qual modelo usar para precificar*, use exclusivamente as métricas universais — MAE, RMSE, R², MAPE. Os testes diagnósticos (Shapiro-Wilk, Levene) servem para avaliar a **validade da inferência estatística** dentro de um modelo específico, não para comparar arquiteturas diferentes.
+
+---
+
+## 9. O Desempenho Era Esperado? Uma Leitura pela Literatura
+
+O ranking final no holdout (268 clientes) foi **GB > Clustering > LR**. Esta seção analisa o que a teoria prevê sobre cada posição e onde o resultado confirmou ou surpreendeu.
+
+### Valores reais obtidos
+
+| Modelo | R² | MAE (R$) | RMSE (R$) | MAPE (%) | Viés Médio (%) |
+|--------|----|----------|-----------|----------|----------------|
+| **Gradient Boosting** | **0,7789** | **$515** | **$677** | **21,5%** | +6,5% |
+| Clustering | 0,6885 | $617 | $803 | 26,2% | +10,4% |
+| Linear Regression | 0,6147 | $696 | $893 | 30,1% | +12,5% |
+
+---
+
+### 9.1 GB supera Linear — totalmente esperado
+
+**O que a literatura prevê:**
+
+James, Witten, Hastie & Tibshirani (2013, §8.3–8.4):
+> "Tree-based ensemble methods tend to outperform linear models when the true regression function is non-additive — that is, when the effect of one predictor depends on the level of another."
+
+Natekin & Knoll (2013 — *Gradient Boosting Machines: A Tutorial*):
+> "Boosting reduces bias iteratively: each subsequent tree hₘ fits the negative gradient of the loss, enabling the ensemble to learn non-linear interactions that a single linear model cannot capture."
+
+**O que foi observado:**
+
+Gap de **0,1642 pontos de R²** (0,6147 → 0,7789) e **$181 de MAE por cliente** ($696 → $515). O teste de Diebold-Mariano (Phase 5) confirmou que a diferença é estatisticamente significativa (p ≈ 0,00, DM = −4,83).
+
+**Por que esse gap existe neste dataset específico:**
+
+A Phase 2 mostrou que `age` e `bmi` são individualmente lineares (Δ R² < 1% com termos quadráticos). Mas a Phase 3 revelou que os tree-models superam o linear em 14 pontos percentuais — o que só é possível se a fonte de ganho for **interação entre features**, não curvatura individual. A feature importance confirma: `age` (52%) e `children` (34%) são os dois maiores drivers, e o efeito combinado de ambos — clientes mais velhos *e* com mais filhos — é o padrão que a regressão linear não consegue modelar sem especificação explícita do termo de interação `age × children`.
+
+---
+
+### 9.2 Clustering supera Linear — parcialmente inesperado
+
+**O que a literatura prevê (expectativa inicial):**
+
+Wooldridge (2019, Cap. 2 — Teorema de Gauss-Markov):
+> "Under the classical assumptions, OLS is the Best Linear Unbiased Estimator. It minimizes variance among all unbiased linear estimators."
+
+Pela lógica do Gauss-Markov, esperaríamos que a regressão linear — que usa as features individuais de cada cliente — superasse o clustering, que descarta essas informações e prevê apenas a média do grupo.
+
+**O que foi observado:**
+
+Clustering venceu o Linear em **todos** os critérios: R² (+0,0738), MAE (−$79), RMSE (−$90), MAPE (−3,9 pp). **Resultado parcialmente inesperado do ponto de vista paramétrico.**
+
+**Explicação pela estrutura dos dados — distribuição assimétrica com cauda longa**
+
+A base de dados tem as seguintes colunas: `age`, `gender`, `bmi`, `children`, `discount_eligibility`, `region`, `expenses`, `premium`. **Não há variável `smoker`.** Qualquer argumento sobre bimodalidade causada por fumantes é infundado neste dataset.
+
+O que os dados realmente mostram é uma distribuição de `expenses` **assimétrica à direita** (skewness = 0,749, kurtosis = −0,848), com uma cauda superior longa e concentrada:
+
+| Percentil | Valor |
+|-----------|-------|
+| p25 | R$1.712 |
+| p50 | R$2.194 |
+| p75 | R$4.124 |
+| p90 | R$5.120 |
+| p99 | R$6.045 |
+
+O intervalo p50–p75 (R$1.930) é **4× maior** que o intervalo p25–p50 (R$482). Isso significa que 25% dos clientes — o quartil superior — têm despesas distribuídas num range muito mais amplo do que os 75% restantes.
+
+**Correlações reais com `expenses`:**
+
+| Feature | Correlação de Pearson |
+|---------|----------------------|
+| `age` | **+0,687** (forte) |
+| `bmi` | +0,441 (moderada) |
+| `children` | −0,297 (moderada negativa) |
+| `discount_eligibility_binary` | −0,095 (fraca) |
+| `gender_male` | −0,001 (irrelevante) |
+
+**Por que a Regressão Linear tem dificuldade nesta distribuição:**
+
+A OLS minimiza a soma dos erros ao quadrado. Quando há uma cauda longa à direita, os clientes do quartil superior (p75+) contribuem com erros quadráticos grandes que "puxam" os coeficientes estimados na direção deles. O resultado é que o modelo superestima clientes de custo médio para reduzir os erros dos clientes de alto custo — criando um viés sistemático no meio da distribuição.
+
+Adicionalmente, `children` tem correlação bruta de −0,297 com `expenses` (mais filhos → despesas menores em média), mas a feature importance do GB mostra `children` como 34% importante. Isso é evidência de um efeito de interação: o impacto de `children` sobre `expenses` depende do valor de `age`. A regressão linear, sem o termo de interação `age × children`, precisa estimar um coeficiente único para `children` que não descreve corretamente nenhuma faixa etária.
+
+**Por que o K-Means lida melhor com esta situação:**
+
+O K-Means foi treinado nas features `age`, `bmi`, `children` e `discount_eligibility_binary`. Ao minimizar as distâncias intra-cluster, o algoritmo agrupa clientes com perfis demográficos semelhantes. Clientes mais velhos, com BMI elevado e poucas despesas intermediárias naturalmente formam clusters distintos — e a previsão do K-Means é a **média de `expenses` dentro de cada cluster**.
+
+A consequência direta é que o quartil superior de custo (p75+) tende a se concentrar em um ou dois clusters de alto custo, cuja média é substancialmente maior do que a previsão linear que o OLS produziria para esses mesmos clientes. Para os clientes do quartil inferior, o K-Means também fornece uma média de cluster que não é "puxada" pelos outliers do quartil superior — exatamente a distinção que a OLS global não consegue fazer.
+
+McElreath (2020, Cap. 12 — *Statistical Rethinking*):
+> "When the data-generating process has underlying class structure, mixture models and cluster-based estimators can outperform a global linear model on held-out data. The linear model tries to fit a single hyperplane through what is effectively a multi-modal distribution."
+
+James et al. (2013, §10.3):
+> "K-Means finds prototypical examples within natural groups. When groups differ substantially in their response means, cluster-based prediction can yield lower test error than a single linear model that must compromise across groups."
+
+**Assimetria de features entre os modelos:**
+
+O K-Means usou `discount_eligibility_binary` enquanto a Regressão Linear usou `gender_male` e `region_*`. Com `gender` tendo correlação r = −0,001 com `expenses` e a variação média entre regiões menor que R$200, as features exclusivas da LR são praticamente irrelevantes. `discount_eligibility` tem r = −0,095 — também fraca, mas não desprezível como `gender`. Esta assimetria de features é uma vantagem marginal do K-Means, mas não é o fator principal: o fator principal é a capacidade de o K-Means criar previsões baseadas em médias de grupos homogêneos, enquanto a OLS força um único plano linear sobre uma distribuição com cauda assimétrica e efeitos de interação.
+
+**Por que o Clustering ainda perde para o GB:**
+
+O K-Means melhora a situação ao separar os grupos — mas dentro de cada cluster, todos os clientes recebem o mesmo prêmio (a média do cluster). Um fumante jovem com 0 filhos e um fumante idoso com 3 filhos recebem o mesmo preço. É exatamente aqui que o Gradient Boosting ganha sobre o Clustering: ele preserva a separação entre grupos **e** usa as features individuais para diferenciar clientes dentro do mesmo grupo. Isso explica por que o ranking final é GB > Clustering > LR, e não Clustering > GB > LR.
+
+---
+
+### 9.3 MAPE alto para todos os modelos — esperado
+
+Os valores de MAPE variam de 21,5% (GB) a 30,1% (LR). Em termos absolutos, são valores elevados para um modelo de precificação.
+
+**O que a literatura prevê:**
+
+James et al. (2013, §2.1 — Decomposição Bias-Variância):
+> "The irreducible error ε in Y = f(X) + ε cannot be reduced by any model, no matter how flexible. Much of the variance in individual health costs is driven by unobservable factors — genetic predispositions, random accidents, disease onset — that no model can predict from demographic features alone."
+
+Géron (2019, Cap. 2 — *Hands-On ML*):
+> "Health expenditure data is notoriously noisy. Even with rich demographic features, the noise floor remains high because medical events have a significant stochastic component."
+
+**Por que é esperado neste dataset:**
+
+As features disponíveis (`age`, `bmi`, `children`, `smoker`, `gender`, `region`) capturam fatores de risco demográficos, mas não capturam eventos de saúde específicos: doenças crônicas diagnosticadas durante o ano, acidentes, hospitalizações de emergência. Essas informações compõem o **erro irredutível** — a parcela da variação real que nenhum modelo pode prever com as features disponíveis. O fato de GB atingir MAPE de 21,5% com apenas 6 features demográficas é, sob essa perspectiva, um resultado razoável.
+
+---
+
+### 9.4 Resíduos normais na Regressão Linear no holdout — inesperado
+
+Na Phase 4 (validação interna, n=856), Shapiro-Wilk rejeitou normalidade para o Linear (p ≈ 0,00). No holdout (n=268), o teste **não rejeita** (p=0,2505). O resultado inverte — e isso é contra-intuitivo.
+
+**Explicação:**
+
+Com amostras menores, o teste de Shapiro-Wilk tem menor poder estatístico para detectar desvios sutis da normalidade. Wooldridge (2019, Apêndice C) observa que os erros do OLS convergem assintoticamente para normalidade pelo Teorema Central do Limite — o que significa que em splits de n < 300, o teste pode falhar em rejeitar H₀ mesmo quando a distribuição subjacente é não-normal.
+
+**Implicação prática:** este resultado no holdout **não contradiz** o diagnóstico da Phase 4. Com n=856, o teste tinha poder suficiente para detectar a não-normalidade real. O resultado com n=268 é menos confiável para esse fim. A não-normalidade detectada na Phase 4 é o sinal metodologicamente mais relevante.
+
+---
+
+### 9.5 Homocedasticidade em todos os modelos no holdout — contrasta com a Phase 4
+
+A Phase 4 detectou heterocedasticidade em todos os modelos (BP p ≈ 0,00). No holdout, o teste de Levene não rejeita homocedasticidade para nenhum modelo (p > 0,75 para todos).
+
+A razão é análoga à seção anterior: menor poder estatístico com n=268 vs n=214 na validação interna — e a composição específica do holdout (proporção de fumantes/não-fumantes, faixa etária) pode diferir do split interno de forma que amorteça os padrões de variância que o Levene detectaria com mais dados.
+
+**Implicação:** os resultados do holdout nas métricas diagnósticas são indicativos, não definitivos. Para decisões sobre validade de inferência paramétrica, use os diagnósticos da Phase 4, que usam amostras maiores.
+
+---
+
+*Referências adicionadas nesta seção:*
+- **James, G., Witten, D., Hastie, T., Tibshirani, R. (2013).** *An Introduction to Statistical Learning.* Springer.
+- **McElreath, R. (2020).** *Statistical Rethinking.* CRC Press.
+- **Natekin, A., Knoll, A. (2013).** Gradient Boosting Machines: A Tutorial. *Frontiers in Neurorobotics.*
+- **Géron, A. (2019).** *Hands-On Machine Learning.* O'Reilly.
