@@ -745,6 +745,53 @@ Para escolher o modelo de precificação mais adequado, priorize nesta ordem:
 
 ---
 
+## 7.1 Por Que a Regressão Linear Tem Menor Churn e Maior Lucro que o Clustering — Análise Estatística
+
+### Contexto
+
+Apesar de o Clustering superar a Regressão Linear nas métricas convencionais de acurácia (MAE, RMSE, R² no holdout de 268 clientes), ao aplicar os preços sugeridos pelos modelos aos clientes existentes, a Regressão Linear demonstra **desempenho superior em dois critérios de negócio críticos**:
+
+| Métrica | Clustering | Regressão Linear |
+|---------|-----------|-----------------|
+| Clientes com Churn >= 50% | 148 (55,2%) | 140 (52,2%) |
+| Lucro Potencial (sem churn) | R$ 261.834 | R$ 266.855 |
+| Lucro Previsto (com churn) | R$ 34.540 | R$ 37.739 |
+
+### Este resultado é ao acaso?
+
+**Não.** Trata-se de uma consequência estrutural da diferença entre precificação individual e precificação por grupo médio. Dois mecanismos explicam isso:
+
+#### Mecanismo 1 — Dispersão do aumento de preço
+
+A Regressão Linear atribui a cada cliente um preço proporcional às suas **despesas estimadas individualmente**: `Amount to Charge = estimated_expenses / 0.75`. O aumento percentual em relação ao prêmio atual é calibrado por cliente.
+
+O Clustering atribui a todos os clientes do mesmo cluster o **mesmo preço médio do cluster**, independentemente de quanto as despesas individuais desviam da média. Clientes com despesas abaixo da média do cluster recebem um preço desproporcional ao seu custo real — gerando um aumento percentual alto e maior churn.
+
+Formalmente:
+
+```
+Var_clustering(ΔP_i) = Var_lm(ΔP_i) + variância intra-cluster  >=  Var_lm(ΔP_i)
+```
+
+Como a função de churn RDD é **superlinear** após o limiar de 20% (parâmetro β₃ = 1,5 amplifica aumentos acima da descontinuidade), maior dispersão nos aumentos de preço empurra sistematicamente mais clientes acima do limiar de churn de 50%. Isso explica os 8 clientes extras em churn no Clustering.
+
+#### Mecanismo 2 — OLS minimiza o erro quadrático médio
+
+O estimador OLS minimiza a soma dos quadrados dos resíduos. O Teorema de Gauss-Markov (Wooldridge 2019, Cap. 2) garante que é o **Melhor Estimador Linear Não-Viesado (BLUE)** — nenhum outro estimador linear atinge menor erro quadrático médio sob as hipóteses clássicas. Isso significa que `estimated_expenses` fica, em média, mais próximo de `actual_expenses` do que qualquer previsão linear alternativa, incluindo a média do cluster.
+
+O estimador de média do cluster não minimiza MSE no nível individual — minimiza a inércia intra-cluster, que é um objetivo diferente. Clientes de alto custo dentro de clusters de custo médio ficam subprecificados; clientes de baixo custo dentro de clusters caros ficam sobreprecificados. Ambos os efeitos reduzem o lucro total em comparação com a LR.
+
+### Generalização esperada
+
+Esse padrão (LR > Clustering em retenção e lucro por cliente, mesmo quando Clustering = melhor em acurácia de previsão) é bem documentado na literatura atuarial:
+
+- **Frees (2010):** precificação baseada em regressão produz prêmios atuarialmente justos; métodos por grupo sacrificam precisão individual por interpretabilidade, gerando pressão de seleção adversa em mercados competitivos.
+- **Denuit et al. (2007):** heterogeneidade de prêmio dentro de grupos de risco é o principal driver de deterioração de portfólio; qualquer método que media sobre variação intra-grupo subprecifica os piores riscos e sobreprecifica os melhores.
+
+**Caveat:** Esta vantagem da LR sobre o Clustering se mantém dentro da classe de precificação linear. O Gradient Boosting, ao capturar interações não-lineares entre features, estende essa vantagem a um nível superior de complexidade do modelo — o mesmo argumento estrutural, aplicado com maior poder preditivo.
+
+---
+
 ## 8. Parâmetros que Fazem Sentido Comparar entre os Modelos
 
 Antes de interpretar os resultados, é necessário distinguir **métricas universais** — válidas para comparar qualquer modelo preditivo — de **métricas diagnósticas** — cuja interpretação depende da arquitetura de cada modelo.
