@@ -809,16 +809,18 @@ Após a seleção formal do Kernel Ridge como modelo vencedor, um experimento ad
 O cenário simulado:
 
 1. Um gestor forneceu a base de treino (80%) ao **Claude Code equipado com Claude Opus 4.7** com o pedido: *"Tenho esses dados de clientes de seguro saúde. Crie uma forma de prever os gastos médicos de futuros clientes."*
-2. O Claude Opus 4.7 autonomamente comparou quatro algoritmos via validação cruzada 5-fold e escolheu **Random Forest Regression** (400 árvores, `min_samples_leaf=2`) como o melhor:
+2. O Claude Opus 4.7 autonomamente comparou **cinco algoritmos** via validação cruzada 5-fold, aplicou **GridSearchCV** nos 3 melhores candidatos, e escolheu **Random Forest (tuned)** (`n_estimators=300, max_depth=8, max_features=0.5, min_samples_split=5`) como vencedor:
 
 | Modelo | CV R² | CV MAE (R$) | CV RMSE (R$) |
-|--------|--------|-------------|--------------|
-| Regressão Linear | 0.622 | 683.98 | 868.96 |
-| Ridge (L2) | 0.622 | 683.93 | 868.93 |
-| **Random Forest** | **0.824** | **460.31** | **594.34** |
-| Gradient Boosting | 0.809 | 477.34 | 618.35 |
+|--------|---------|-------------|---------------|
+| Regressão Linear / Ridge | 0.618 | 687 | 874 |
+| Hist. Gradient Boosting (tuned) | 0.822 | -- | -- |
+| Gradient Boosting (tuned) | 0.827 | -- | -- |
+| **Random Forest (tuned)** | **0.830** | **428** | **546** |
 
-3. A base de teste (268 clientes) foi fornecida como "novos clientes" e o Random Forest gerou previsões individuais de `estimated_expenses`, armazenadas em `data/novos_clientes_previsao_de_despesas.csv`.
+O vibe coder avaliou o RF tuned em um **conjunto de validação interno** (20% dos 1.070 clientes de treino): R² = 0.8425, MAE = R$428,35, RMSE = R$546,19. Os 268 clientes holdout do notebook nunca foram vistos pelo Claude nesta etapa.
+
+3. A base de teste (268 clientes, `novos_clientes.csv`, mesmo split RANDOM_STATE=1) foi fornecida como novos clientes e o Random Forest gerou previsões individuais de `estimated_expenses`, armazenadas em `data/novos_clientes_previsao_de_despesas.csv`.
 
 ### 21.2. Random Forest: Fundamentação Teórica
 
@@ -833,21 +835,28 @@ $$\hat{y} = \frac{1}{B} \sum_{b=1}^B T_b(x)$$
 - **Não-linearidade automática:** árvores de decisão particionam o espaço de entrada em retângulos, capturando relações arbitrariamente complexas e interações de alta ordem.
 - **Sem forma funcional fechada:** RF pertence à tradição de aprendizado estatístico (Breiman, Friedman, Tibshirani), NÃO ao framework de Identificação de Sistemas (Aguirre, Ljung). Não existe vetor β, equação de forma, ou representação dual.
 
-**Por que o Claude Opus 4.7 escolheu RF?** Fernández-Delgado et al. (2014, *JMLR*) avaliou 179 classificadores em 121 bases de dados e concluiu que Random Forest é consistentemente um dos melhores desempenhos em dados tabulares. O CV R² = 0.824 é completamente consistente com essa evidência — razão pela qual a escolha foi metodologicamente defensável dentro dos limites da validação cruzada.
+**Por que o Claude Opus 4.7 escolheu RF?** Fernández-Delgado et al. (2014, *JMLR*) avaliou 179 classificadores em 121 bases de dados e concluiu que Random Forest é consistentemente um dos melhores desempenhos em dados tabulares. O CV R² = 0.830 é completamente consistente com essa evidência — razão pela qual a escolha foi metodologicamente defensável dentro dos limites da validação cruzada. O uso de GridSearchCV adiciona rigor metodológico: o algoritmo não é apenas selecionado, mas seus hiperparâmetros são otimizados sistematicamente.
 
 ### 21.3. O Que a Literatura Prediz
 
 | Predição | Raciocínio |
 |---------|-----------|
 | RF ≥ KR em CV R² | Métodos ensemble superam sistematicamente modelos não-lineares únicos em dados tabulares (Fernández-Delgado et al., 2014) |
-| RF R² treino >> RF R² teste (overfit) | Mesmo com bagging, árvores memorizam padrões; bases pequenas (n=1.338) amplificam esse efeito |
+| RF R² treino > RF R² teste (overfit moderado) | Mesmo com bagging e max_depth=8, há memorização; a distância entre validação interna (RMSE=R$546) e holdout real (RMSE=R$648) confirma gap de ~18% |
 | RF RMSE (teste) ≈ KR RMSE (teste) | O gap de overfit compensa parcialmente a superioridade in-sample do RF |
 
-**Contexto da Versão 1:** Este projeto testou RF na Versão 1 e encontrou overfit moderado-alto (R² treino >> R² teste), razão pela qual foi substituído pelo KR na Versão 2.
+**Contexto da Versão 1:** Este projeto testou RF na Versão 1 e encontrou overfit moderado-alto (R² treino >> R² teste), razão pela qual foi substituído pelo KR na Versão 2. Na comparação atual (Versão 2 com RF tuned via GridSearchCV), o overfit foi **moderado**: validação interna RMSE = R$546 vs. holdout real RMSE = R$647,89 (+18%), ainda assim competitivo com o KR-RBF (RMSE = R$650,53).
 
 ### 21.4. Comparação Quadrangular nos 268 Clientes Holdout
 
-O notebook principal (`2_linear_regression_and_clustering_compairson_health_insurance_case.ipynb`) apresenta uma tabela comparando todos os quatro métodos nos mesmos 268 clientes: Clustering, Regressão Linear, Kernel Ridge, e Random Forest (vibe coding). As métricas de negócio utilizadas são as mesmas de todo o estudo: despesas estimadas, erro, preço a cobrar, lucro bruto, variação de pagamento, probabilidade de churn (RDD Souza 2025), e lucro considerando churn.
+O notebook principal (`2_linear_regression_and_clustering_compairson_health_insurance_case.ipynb`) apresenta uma tabela comparando todos os quatro métodos nos mesmos 268 clientes holdout. Os resultados de acurácia preditiva no holdout real são:
+
+| Modelo | R² (holdout) | RMSE (holdout) |
+|--------|--------------|----------------|
+| Kernel Ridge (KR-RBF) | 0.780 | R$650,53 |
+| **Random Forest (Vibe Coding)** | **0.797** | **R$647,89** |
+
+Resultado notável: o RF produzido em minutos por um gestor sem background técnico ficou a **R$2,64 de diferença no RMSE** do modelo selecionado por metodologia formal de seis fases. As métricas de negócio -- despesas estimadas, erro, preço a cobrar, lucro bruto, variação de pagamento, probabilidade de churn (RDD Souza 2025), e lucro considerando churn -- são comparadas na tabela interativa do notebook.
 
 ### 21.5. Trade-off: Acurácia vs. Auditabilidade
 
