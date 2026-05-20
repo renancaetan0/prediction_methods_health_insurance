@@ -1,0 +1,13 @@
+# Python dependencies for prediction_methods_health_insurance.ipynb
+# Generated from the environment used to run the notebook end-to-end.
+ipython==9.12.0
+joblib==1.5.3
+matplotlib==3.10.8
+numpy==2.4.4
+pandas==3.0.2
+plotly==6.7.0
+scikit-fuzzy==0.5.0
+scikit-learn==1.8.0
+scipy==1.17.1
+seaborn==0.13.2
+statsmodels==0.14.6
