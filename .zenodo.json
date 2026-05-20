@@ -1,0 +1,22 @@
+{
+  "title": "Health Insurance Pricing: Prediction Methods, Churn Risk and AI Benchmark",
+  "description": "A reproducible data science case for health insurance pricing. The project compares K-Means clustering, linear regression, a formally selected non-linear model (Kernel Ridge) and an AI-generated Random Forest workflow on the same public Kaggle dataset, connecting expense prediction to premium pricing, churn risk and profit for both new and current customers.",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Caetano, Renan de Abreu"
+    }
+  ],
+  "keywords": [
+    "health insurance",
+    "pricing",
+    "machine learning",
+    "churn",
+    "System Identification",
+    "Random Forest",
+    "Kernel Ridge",
+    "data science"
+  ]
+}

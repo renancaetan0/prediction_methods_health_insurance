@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "Health Insurance Pricing: Prediction Methods, Churn Risk and AI Benchmark"
+abstract: >-
+  A reproducible data science case for health insurance pricing. The project
+  compares K-Means clustering, linear regression, a formally selected non-linear
+  model (Kernel Ridge) and an AI-generated Random Forest workflow on the same
+  public Kaggle dataset, and connects expense prediction to premium pricing,
+  churn risk and profit for both new and current customers.
+type: software
+authors:
+  - family-names: "Caetano"
+    given-names: "Renan de Abreu"
+    email: "renanacaetano@gmail.com"
+repository-code: "https://github.com/renancaetan0/prediction_methods_health_insurance"
+license: MIT
+version: "1.0.0"
+date-released: "2026-05-20"
+keywords:
+  - health insurance
+  - pricing
+  - machine learning
+  - churn
+  - System Identification
+  - Random Forest
+  - Kernel Ridge
+  - data science
