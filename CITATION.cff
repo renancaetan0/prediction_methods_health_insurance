@@ -13,9 +13,10 @@ authors:
     given-names: "Renan de Abreu"
     email: "renanacaetano@gmail.com"
 repository-code: "https://github.com/renancaetan0/prediction_methods_health_insurance"
+doi: "10.5281/zenodo.20325214"
 license: MIT
 version: "1.0.0"
-date-released: "2026-05-20"
+date-released: "2026-05-21"
 keywords:
   - health insurance
   - pricing

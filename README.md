@@ -1,5 +1,7 @@
 # Health Insurance Pricing: Prediction Methods, Churn Risk and AI Benchmark
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20325214.svg)](https://doi.org/10.5281/zenodo.20325214)
+
 This repository contains a reproducible data science case for health insurance
 pricing. The project compares classical segmentation, interpretable regression,
 formal non-linear model selection and an AI-generated machine learning workflow
@@ -105,8 +107,8 @@ health_insurance_case_linear_regression_and_clustering_compairson/
 └── README.md
 ```
 
-Local research drafts and publication notes are stored under `ARTIGO/`, which is
-intentionally ignored by Git.
+Local research drafts and publication notes are stored under `ARTIGO/` and are
+intentionally ignored by Git. Only the final publication PDFs are tracked.
 
 ## Environment
 
@@ -124,6 +126,9 @@ The notebook was developed in Python and uses the following main libraries:
 - joblib
 
 ## Notes
+
+The archived release is available on Zenodo with DOI:
+<https://doi.org/10.5281/zenodo.20325214>.
 
 This repository is an educational and research-oriented case study. It is not an
 actuarial production model and should not be used for real premium decisions
